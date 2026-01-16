@@ -1,0 +1,70 @@
+/*
+============================================================================
+NOMBRE DEL SCRIPT: Setup Inicial Data Warehouse (Arquitectura Medallion)
+DESCRIPCIÓN:
+    Este script inicializa la base de datos para el Data Warehouse y crea
+    los esquemas correspondientes a la arquitectura de capas:
+    
+    1. Bronze (Raw): Datos crudos.
+    2. Silver (Clean): Datos limpios y transformados.
+    3. Gold (Business): Modelos dimensionales para reporte.
+
+NOTA TÉCNICA:
+    Este script es "Idempotente" (Re-ejecutable). Incluye validaciones 
+    (IF NOT EXISTS) para evitar errores si los objetos ya existen.
+    
+    * Se utiliza SQL Dinámico (EXEC) para crear los esquemas porque T-SQL
+      requiere que 'CREATE SCHEMA' sea la primera sentencia de un lote.
+============================================================================
+*/
+
+-- Creación del Data Warehouse con validaciones y mejores prácticas
+USE master;
+GO
+
+-- 1. Verificar si la base de datos existe antes de crearla
+IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'DataWarehouse')
+BEGIN
+    CREATE DATABASE [DataWarehouse];
+    PRINT 'Base de datos DataWarehouse creada exitosamente.';
+END
+ELSE
+BEGIN
+    PRINT 'La base de datos DataWarehouse ya existe.';
+END
+GO
+
+USE [DataWarehouse];
+GO
+
+-- 2. Configurar el Modelo de Recuperación a SIMPLE
+-- Recomendado para Data Warehouses para evitar que el log de transacciones crezca descontroladamente durante cargas masivas.
+ALTER DATABASE [DataWarehouse] SET RECOVERY SIMPLE;
+GO
+
+-- 3. Creación de Esquemas (Arquitectura Medallion)
+-- Se usa EXEC sp_executesql porque CREATE SCHEMA debe ser la primera sentencia en un batch
+
+-- Capa BRONZE (Raw/Cruda): Datos tal cual vienen de la fuente
+IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'bronze')
+BEGIN
+    EXEC('CREATE SCHEMA [bronze]');
+    PRINT 'Esquema bronze creado.';
+END
+GO
+
+-- Capa SILVER (Clean/Limpia): Datos deduplicados, limpios y validados
+IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'silver')
+BEGIN
+    EXEC('CREATE SCHEMA [silver]');
+    PRINT 'Esquema silver creado.';
+END
+GO
+
+-- Capa GOLD (Curated/Refinada): Modelos dimensionales (Estrella/Copo de nieve) listos para BI
+IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'gold')
+BEGIN
+    EXEC('CREATE SCHEMA [gold]');
+    PRINT 'Esquema gold creado.';
+END
+GO
